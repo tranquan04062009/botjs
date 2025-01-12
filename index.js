@@ -9,6 +9,26 @@ const bot = new TelegramBot(token, { polling: true });
 let userSpamSessions = {}; // Lưu danh sách spam theo người dùng
 let blockedUsers = []; // Lưu danh sách người dùng bị chặn
 
+// Các header và deviceId giả lập
+const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36"
+];
+
+const referrers = [
+    "https://www.google.com/",
+    "https://www.facebook.com/",
+    "https://www.reddit.com/",
+    "https://www.yahoo.com/"
+];
+
+// Hàm tạo deviceId ngẫu nhiên
+const generateDeviceId = () => {
+    return crypto.randomBytes(21).toString("hex");
+};
+
 // Hàm gửi tin nhắn spam trong worker
 const sendMessageInWorker = (username, message, chatId, sessionId, progressMessageId) => {
     return new Promise((resolve, reject) => {
@@ -157,27 +177,15 @@ bot.on("callback_query", (query) => {
 
 // Xử lý gửi tin nhắn trong worker
 if (!isMainThread) {
-    const { username, message, chatId, sessionId, progressMessageId } = require("worker_threads").workerData;
+    const { username, message, chatId, sessionId, progressMessageId } = workerData;
 
     const sendMessage = async () => {
         let counter = 0;
-        const userAgents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36"
-        ];
-
-        const referrers = [
-            "https://www.google.com/",
-            "https://www.facebook.com/",
-            "https://www.reddit.com/",
-            "https://www.yahoo.com/"
-        ];
 
         while (true) {
             try {
-                const deviceId = crypto.randomBytes(21).toString("hex");
+                // Tạo deviceId và User-Agent ngẫu nhiên
+                const deviceId = generateDeviceId();
                 const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
                 const randomReferrer = referrers[Math.floor(Math.random() * referrers.length)];
 
@@ -191,34 +199,29 @@ if (!isMainThread) {
                     "X-Forwarded-For": `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`
                 };
 
-                const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
+                const body = `username=${username}&question=${message}&deviceId=${deviceId}`;
 
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers,
-                    body
-                });
+                const response = await fetch(url, { method: "POST", headers, body });
 
-                if (response.status !== 200) {
-                    console.log(`[Lỗi] Bị giới hạn, đang chờ 5 giây...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                } else {
+                if (response.ok) {
                     counter++;
-                    console.log(`[Tin nhắn] Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
-
-                    // Cập nhật tin nhắn tiến trình
-                    bot.editMessageText(`Phiên ${sessionId}: Đã gửi ${counter} tin nhắn...`, {
-                        chat_id: chatId,
-                        message_id: progressMessageId
-                    });
+                    parentPort.postMessage({ success: true });
+                } else {
+                    console.log(`Lỗi: ${response.statusText}`);
+                    parentPort.postMessage({ success: false, error: response.statusText });
+                    break;
                 }
+
+                parentPort.postMessage({
+                    success: true,
+                    progress: `Phiên ${sessionId}: Đã gửi ${counter} tin nhắn...`
+                });
             } catch (error) {
-                console.error(`[Lỗi] ${error.message}`);
+                console.error(`Lỗi gửi tin nhắn: ${error.message}`);
+                parentPort.postMessage({ success: false, error: error.message });
                 break;
             }
         }
-
-        parentPort.postMessage({ success: true });
     };
 
     sendMessage();
