@@ -64,7 +64,7 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
             }
 
             // Thời gian chờ ngẫu nhiên giữa các lần gửi tin nhắn
-            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 1500) + 500));
+            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 1000) + 500));
         } catch (error) {
             console.error(`[Lỗi] ${error}`);
             await new Promise(resolve => setTimeout(resolve, 2000));
