@@ -34,7 +34,7 @@ const sendMessageInWorker = (username, message, chatId, sessionId, progressMessa
     return new Promise((resolve, reject) => {
         const worker = new Worker(__filename, {
             workerData: {
-                username,
+                username, // Truyền các tham số vào workerData
                 message,
                 chatId,
                 sessionId,
@@ -177,7 +177,7 @@ bot.on("callback_query", (query) => {
 
 // Xử lý gửi tin nhắn trong worker
 if (!isMainThread) {
-    const { username, message, chatId, sessionId, progressMessageId } = workerData;
+    const { username, message, chatId, sessionId, progressMessageId } = workerData;  // Đảm bảo workerData được truy cập chính xác
 
     const sendMessage = async () => {
         let counter = 0;
