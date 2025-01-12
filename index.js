@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const fetch = require("node-fetch");
 const TelegramBot = require("node-telegram-bot-api");
 
-const token = '7361099428:AAHsbnKKUK_aYNsPZNX4BqMLPg3su79JG90'; // Thay bằng token bot của bạn
+const token = '7755708665:AAEOgUu_rYrPnGFE7_BJWmr8hw9_xrZ-5e0'; // Thay bằng token bot của bạn
 const bot = new TelegramBot(token, { polling: true });
 
 let userSpamSessions = {}; // Lưu danh sách spam theo người dùng
