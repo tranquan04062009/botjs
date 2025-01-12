@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const fetch = require("node-fetch");
 const TelegramBot = require("node-telegram-bot-api");
 
-const token = 'YOUR_TELEGRAM_BOT_TOKEN';
+const token = '7755708665:AAEOgUu_rYrPnGFE7_BJWmr8hw9_xrZ-5e0';
 const bot = new TelegramBot(token, { polling: true });
 
 let userSpamSessions = {};
