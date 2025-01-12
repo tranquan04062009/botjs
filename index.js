@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const fetch = require("node-fetch");
 const TelegramBot = require("node-telegram-bot-api");
 
-const token = '7755708665:AAEOgUu_rYrPnGFE7_BJWmr8hw9_xrZ-5e0'; // Thay bằng token bot của bạn
+const token = 'YOUR_TELEGRAM_BOT_TOKEN';
 const bot = new TelegramBot(token, { polling: true });
 
 let userSpamSessions = {};
@@ -25,8 +25,9 @@ const referrers = [
 const getRandomValue = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const getRandomIP = () => `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
 
+
 const sendMessage = async (username, message, chatId, sessionId, progressMessageId) => {
-    let counter = 0;
+  let counter = 0;
     let retryDelay = 1000;
     while (userSpamSessions[chatId]?.[sessionId - 1]?.isActive && userSpamSessions[chatId]?.[sessionId - 1]?.isEnabled) {
         try {
@@ -45,7 +46,7 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
                 "X-Forwarded-For": ip
             };
 
-            const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
+             const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
             const response = await fetch(url, {
                 method: "POST",
                 headers,
@@ -53,7 +54,7 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
             });
 
             if (response.status !== 200) {
-                console.log(`[Lỗi] Bị giới hạn, đang chờ ${retryDelay / 1000} giây...`);
+                console.log(`[Lỗi] Phiên ${sessionId}: Bị giới hạn, đang chờ ${retryDelay / 1000} giây...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retryDelay = Math.min(retryDelay * 2, 10000);
             } else {
@@ -69,25 +70,50 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
             // Random short delay
             await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 100));
         } catch (error) {
-            console.error(`[Lỗi] ${error}`);
+           console.error(`[Lỗi] Phiên ${sessionId}: ${error}`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             retryDelay = Math.min(retryDelay * 2, 10000);
         }
     }
 };
 
-
 const startConcurrentSpam = async (username, message, chatId, currentSessionId, progressMessageId) => {
-    const concurrentSessions = 5;  //Số lượng phiên spam đồng thời
-    const promises = [];
+     const concurrentSessions = 5;
+      const promises = [];
     for (let i = 0; i < concurrentSessions; i++) {
-        promises.push(sendMessage(username, message, chatId, currentSessionId, progressMessageId));
+          promises.push(sendMessage(username, message, chatId, currentSessionId, progressMessageId));
     }
     await Promise.all(promises);
 }
 
-const isBlocked = (chatId) => blockedUsers.includes(chatId);
 
+const startSession = async (chatId, sessionId) => {
+    userSpamSessions[chatId][sessionId - 1].isActive = true;
+    console.log(`[Phiên] Phiên ${sessionId} đã bắt đầu.`);
+};
+
+const stopSession = async (chatId, sessionId) => {
+    userSpamSessions[chatId][sessionId - 1].isActive = false;
+    console.log(`[Phiên] Phiên ${sessionId} đã dừng.`);
+};
+
+
+const toggleSession = async (chatId, sessionId) => {
+  const session = userSpamSessions[chatId].find(s => s.id === sessionId);
+  if (session) {
+      session.isEnabled = !session.isEnabled;
+      console.log(`[Phiên] Phiên ${sessionId} đã được ${session.isEnabled ? 'bật' : 'tắt'}.`);
+        if (session.isEnabled && !session.isActive) {
+          startSession(chatId,sessionId)
+          const progressMessage = await bot.sendMessage(chatId, `🚀 Phiên ${sessionId}: Đang bắt đầu lại spam...`);
+          startConcurrentSpam(session.username, session.message, chatId, sessionId, progressMessage.message_id);
+        }
+  } else {
+         console.log(`[Lỗi] Không tìm thấy phiên spam với ID ${sessionId}.`);
+  }
+};
+
+const isBlocked = (chatId) => blockedUsers.includes(chatId);
 
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
@@ -131,11 +157,11 @@ bot.onText(/🚀 Bắt đầu Spam/, (msg) => {
             const currentSessionId = userSpamSessions[chatId].length + 1;
             userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true, isEnabled: true });
 
-             bot.sendMessage(chatId, `🚀 Phiên ${currentSessionId}: Đang bắt đầu spam...`, {
+           bot.sendMessage(chatId, `🚀 Phiên ${currentSessionId}: Đang bắt đầu spam...`, {
               reply_markup: { inline_keyboard: [[{ text: "🛑 Dừng", callback_data: `stop_${currentSessionId}` }]] }
-          }).then((sentMessage) => {
+          }).then(async (sentMessage) => {
               const progressMessageId = sentMessage.message_id;
-               startConcurrentSpam(username, message, chatId, currentSessionId, progressMessageId);
+              startConcurrentSpam(username, message, chatId, currentSessionId, progressMessageId);
             });
 
             bot.sendMessage(chatId, `✅ Phiên spam ${currentSessionId} đã bắt đầu!`);
@@ -171,7 +197,7 @@ bot.onText(/📋 Danh sách Spam/, (msg) => {
         }
     });
     } else {
-        bot.sendMessage(chatId, "Không có phiên spam nào đang hoạt động.");
+      bot.sendMessage(chatId, "Không có phiên spam nào đang hoạt động.");
     }
 });
 
@@ -181,28 +207,16 @@ bot.on("callback_query", async (query) => {
     const callbackData = query.data;
     const sessionId = parseInt(callbackData.split("_")[1]);
 
-    const sessions = userSpamSessions[chatId] || [];
-    const session = sessions.find(s => s.id === sessionId);
-
-  if(callbackData.startsWith("stop")){
-     if (session) {
-        session.isActive = false;
+    if(callbackData.startsWith("stop")){
+      await stopSession(chatId, sessionId);
         bot.sendMessage(chatId, `✅ Phiên spam ${sessionId} đã bị dừng.`);
-      } else {
-          bot.sendMessage(chatId, `❌ Không tìm thấy phiên spam với ID ${sessionId}.`);
-      }
-  } else if (callbackData.startsWith("toggle")) {
-       if (session) {
-            session.isEnabled = !session.isEnabled;
-            bot.sendMessage(chatId, `⚙️ Phiên spam ${sessionId} đã được ${session.isEnabled ? 'bật' : 'tắt'}.`);
-             // Restart session if enabled and not active
-            if (session.isEnabled && !session.isActive) {
-                 session.isActive = true
-                const progressMessage = await bot.sendMessage(chatId, `🚀 Phiên ${sessionId}: Đang bắt đầu lại spam...`);
-                startConcurrentSpam(session.username, session.message, chatId, sessionId, progressMessage.message_id);
-             }
+    } else if (callbackData.startsWith("toggle")) {
+        await toggleSession(chatId, sessionId);
+       const session = userSpamSessions[chatId].find(s => s.id === sessionId);
+         if(session) {
+           bot.sendMessage(chatId, `⚙️ Phiên spam ${sessionId} đã được ${session.isEnabled ? 'bật' : 'tắt'}.`);
         } else {
-             bot.sendMessage(chatId, `❌ Không tìm thấy phiên spam với ID ${sessionId}.`);
-        }
+           bot.sendMessage(chatId, `❌ Không tìm thấy phiên spam với ID ${sessionId}.`);
+         }
     }
 });
