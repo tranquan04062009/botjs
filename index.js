@@ -25,53 +25,46 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
         "https://www.yahoo.com/"
     ];
 
-    const spamUrls = [
-        "https://ngl.link/api/submit",
-        "https://ngl.link/api/submit",
-        "https://ngl.link/api/submit",
-        "https://ngl.link/api/submit",
-        "https://ngl.link/api/submit",
-        "https://ngl.link/api/submit"
-    ];
-
     while (userSpamSessions[chatId]?.[sessionId - 1]?.isActive) {
         try {
-            const requests = spamUrls.map(async (url) => {
-                const deviceId = crypto.randomBytes(21).toString("hex");
-                const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-                const randomReferrer = referrers[Math.floor(Math.random() * referrers.length)];
+            const deviceId = crypto.randomBytes(21).toString("hex");
+            const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+            const randomReferrer = referrers[Math.floor(Math.random() * referrers.length)];
 
-                const headers = {
-                    "User-Agent": randomUserAgent,
-                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Connection": "keep-alive",
-                    "Referer": randomReferrer,
-                    "X-Forwarded-For": `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`
-                };
+            const url = "https://ngl.link/api/submit";
+            const headers = {
+                "User-Agent": randomUserAgent,
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive",
+                "Referer": randomReferrer,
+                "X-Forwarded-For": `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`
+            };
 
-                const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
+            const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
 
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers,
-                    body
+            const response = await fetch(url, {
+                method: "POST","HEAD","GET"
+                headers,
+                body
+            });
+
+            if (response.status !== 200) {
+                console.log(`[Lỗi] Bị giới hạn, đang chờ 5 giây...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            } else {
+                counter++;
+                console.log(`[Tin nhắn] Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
+
+                // Cập nhật tin nhắn tiến trình
+                bot.editMessageText(`Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`, {
+                    chat_id: chatId,
+                    message_id: progressMessageId
                 });
+            }
 
-                if (response.status === 200) {
-                    counter++;
-                }
-            });
-
-            await Promise.all(requests); // Gửi tất cả request đồng thời
-            console.log(`[Phiên ${sessionId}] Đã gửi ${counter} tin nhắn.`);
-            bot.editMessageText(`Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`, {
-                chat_id: chatId,
-                message_id: progressMessageId
-            });
-
-            // Ngẫu nhiên chờ trước khi lặp lại
-            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 1500) + 500));
+            // Thời gian chờ ngẫu nhiên giữa các lần gửi tin nhắn
+            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 100) + 50));
         } catch (error) {
             console.error(`[Lỗi] ${error}`);
             await new Promise(resolve => setTimeout(resolve, 2000));
