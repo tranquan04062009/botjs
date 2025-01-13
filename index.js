@@ -44,7 +44,7 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
             const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
 
             const response = await fetch(url, {
-                method: "POST"
+                method: "POST",
                 headers,
                 body
             });
