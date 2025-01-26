@@ -5,10 +5,11 @@ const TelegramBot = require("node-telegram-bot-api");
 const token = '7766543633:AAFnN9tgGWFDyApzplak0tiJTafCxciFydo'; // Thay bằng token bot của bạn
 const bot = new TelegramBot(token, { polling: true });
 
-let userSpamSessions = {}; // Lưu danh sách spam theo người dùng
-let blockedUsers = []; // Lưu danh sách người dùng bị chặn
+let userSpamSessions = {}; // Menyimpan daftar spam per pengguna
+let blockedUsers = []; // Menyimpan daftar pengguna yang diblokir
+const adminIdList = [6692083976]; // Tambahkan ID admin di sini
 
-// Hàm gửi tin nhắn spam
+// Fungsi untuk mengirim pesan spam
 const sendMessage = async (username, message, chatId, sessionId) => {
     let counter = 0;
     while (userSpamSessions[chatId]?.[sessionId - 1]?.isActive) {
@@ -28,95 +29,104 @@ const sendMessage = async (username, message, chatId, sessionId) => {
             });
 
             if (response.status !== 200) {
-                console.log(`[Lỗi] Bị giới hạn, đang chờ 5 giây...`);
+                console.log(`[Error] Rate-limited, waiting 5 seconds...`);
                 await new Promise(resolve => setTimeout(resolve, 5000));
             } else {
                 counter++;
-                console.log(`[Tin nhắn] Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
-                bot.sendMessage(chatId, `Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
+                console.log(`[Msg] Session ${sessionId}: Sent ${counter} messages.`);
+                bot.sendMessage(chatId, `Session ${sessionId}: Sent ${counter} messages.`);
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (error) {
-            console.error(`[Lỗi] ${error}`);
+            console.error(`[Error] ${error}`);
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
 };
 
-// Middleware kiểm tra người dùng bị chặn
+// Middleware untuk memeriksa blokir
 const isBlocked = (chatId) => blockedUsers.includes(chatId);
 
-// Lệnh bắt đầu bot
+// Perintah untuk memulai bot
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const username = msg.from.username || "Không có tên người dùng";
-    const firstName = msg.from.first_name || "Không có tên";
+    const username = msg.from.username || "Tidak ada username";
+    const firstName = msg.from.first_name || "Tidak ada nama";
     const userId = msg.from.id;
 
     if (isBlocked(chatId)) {
-        bot.sendMessage(chatId, "Bạn đã bị chặn khỏi việc sử dụng bot này.");
+        bot.sendMessage(chatId, "Anda telah diblokir dari menggunakan bot ini.");
         return;
     }
 
-    // Thông báo cho người dùng về ID của họ
-    bot.sendMessage(chatId, `Chào mừng! ID Telegram của bạn là: ${userId}`);
+    // Beri tahu pengguna ID mereka
+    bot.sendMessage(chatId, `Selamat datang! ID Telegram Anda adalah: ${userId}`);
+
+    // Kirim log ke semua admin tentang pengguna baru
+    adminIdList.forEach((adminId) => {
+        bot.sendMessage(
+            adminId,
+            `Pengguna baru memulai bot:\nID: ${userId}\nUsername: ${username}\nNama: ${firstName}`
+        );
+    });
 
     if (!userSpamSessions[chatId]) {
-        userSpamSessions[chatId] = []; // Khởi tạo danh sách spam cho người dùng mới
+        userSpamSessions[chatId] = []; // Inisialisasi daftar spam untuk pengguna baru
     }
 
-    bot.sendMessage(chatId, "Chọn tính năng bạn muốn sử dụng:", {
+    bot.sendMessage(chatId, "Pilih fitur yang tersedia:", {
         reply_markup: {
             keyboard: [
-                [{ text: "Bắt đầu Spam" }, { text: "Danh sách Spam" }]
+                [{ text: "Start Spam" }, { text: "List Spam" }],
+                [{ text: "Fitur Bot" }]
             ],
             resize_keyboard: true
         }
     });
 });
 
-// Xử lý nút "Bắt đầu Spam"
-bot.onText(/Bắt đầu Spam/, (msg) => {
+// Handle tombol "Start Spam"
+bot.onText(/Start Spam/, (msg) => {
     const chatId = msg.chat.id;
 
     if (isBlocked(chatId)) {
-        bot.sendMessage(chatId, "Bạn đã bị chặn khỏi việc sử dụng bot này.");
+        bot.sendMessage(chatId, "Anda telah diblokir dari menggunakan bot ini.");
         return;
     }
 
-    bot.sendMessage(chatId, "Nhập tên người dùng muốn spam:");
+    bot.sendMessage(chatId, "Masukkan username yang ingin di-spam:");
     bot.once("message", (msg) => {
         const username = msg.text;
-        bot.sendMessage(chatId, "Nhập tin nhắn bạn muốn gửi:");
+        bot.sendMessage(chatId, "Masukkan pesan yang ingin dikirim:");
         bot.once("message", (msg) => {
             const message = msg.text;
             const currentSessionId = userSpamSessions[chatId].length + 1;
             userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true });
             sendMessage(username, message, chatId, currentSessionId);
-            bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`);
+            bot.sendMessage(chatId, `Spam session ${currentSessionId} dimulai!`);
         });
     });
 });
 
-// Xử lý nút "Danh sách Spam"
-bot.onText(/Danh sách Spam/, (msg) => {
+// Handle tombol "List Spam"
+bot.onText(/List Spam/, (msg) => {
     const chatId = msg.chat.id;
 
     if (isBlocked(chatId)) {
-        bot.sendMessage(chatId, "Bạn đã bị chặn khỏi việc sử dụng bot này.");
+        bot.sendMessage(chatId, "Anda telah diblokir dari menggunakan bot ini.");
         return;
     }
 
     const sessions = userSpamSessions[chatId] || [];
     if (sessions.length > 0) {
-        let listMessage = "Danh sách các phiên spam hiện tại:\n";
+        let listMessage = "Sesi spam saat ini:\n";
         sessions.forEach(session => {
-            listMessage += `${session.id}: ${session.username} - ${session.message} [Hoạt động: ${session.isActive}]\n`;
+            listMessage += `${session.id}: ${session.username} - ${session.message} [Aktif: ${session.isActive}]\n`;
         });
 
         const buttons = sessions.map(session => [{
-            text: `Dừng phiên ${session.id}`,
+            text: `Hentikan Session ${session.id}`,
             callback_data: `stop_${session.id}`
         }]);
 
@@ -126,11 +136,11 @@ bot.onText(/Danh sách Spam/, (msg) => {
             }
         });
     } else {
-        bot.sendMessage(chatId, "Không có phiên spam nào đang hoạt động.");
+        bot.sendMessage(chatId, "Tidak ada sesi spam yang aktif.");
     }
 });
 
-// Xử lý "Dừng phiên"
+// Handle "Hentikan Session"
 bot.on("callback_query", (query) => {
     const chatId = query.message.chat.id;
     const sessionId = parseInt(query.data.split("_")[1]);
@@ -139,9 +149,66 @@ bot.on("callback_query", (query) => {
     const session = sessions.find(s => s.id === sessionId);
 
     if (session) {
-        session.isActive = false; // Dừng phiên
-        bot.sendMessage(chatId, `Phiên spam ${sessionId} đã bị dừng.`);
+        session.isActive = false; // Hentikan sesi
+        bot.sendMessage(chatId, `Spam session ${sessionId} telah dihentikan.`);
     } else {
-        bot.sendMessage(chatId, `Không tìm thấy phiên spam với ID ${sessionId}.`);
+        bot.sendMessage(chatId, `Sesi spam dengan ID ${sessionId} tidak ditemukan.`);
+    }
+});
+
+// Admin command untuk melihat semua aktivitas pengguna
+bot.onText(/\/admin/, (msg) => {
+    const chatId = msg.chat.id;
+
+    if (!adminIdList.includes(chatId)) {
+        bot.sendMessage(chatId, "Perintah ini hanya dapat digunakan oleh admin.");
+        return;
+    }
+
+    let adminMessage = "Daftar pengguna bot:\n";
+    Object.keys(userSpamSessions).forEach(userId => {
+        adminMessage += `User ${userId}:\n`;
+        userSpamSessions[userId].forEach(session => {
+            adminMessage += `- [ID ${session.id}] ${session.username}: ${session.message} (Aktif: ${session.isActive})\n`;
+        });
+    });
+
+    bot.sendMessage(chatId, adminMessage);
+});
+
+// Admin command untuk memblokir pengguna
+bot.onText(/\/block (\d+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+
+    if (!adminIdList.includes(chatId)) {
+        bot.sendMessage(chatId, "Perintah ini hanya dapat digunakan oleh admin.");
+        return;
+    }
+
+    const targetId = parseInt(match[1]);
+    if (!blockedUsers.includes(targetId)) {
+        blockedUsers.push(targetId);
+        bot.sendMessage(chatId, `Pengguna ${targetId} telah diblokir.`);
+    } else {
+        bot.sendMessage(chatId, `Pengguna ${targetId} sudah diblokir.`);
+    }
+});
+
+// Admin command untuk membuka blokir pengguna
+bot.onText(/\/unblock (\d+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+
+    if (!adminIdList.includes(chatId)) {
+        bot.sendMessage(chatId, "Perintah ini hanya dapat digunakan oleh admin.");
+        return;
+    }
+
+    const targetId = parseInt(match[1]);
+    const index = blockedUsers.indexOf(targetId);
+    if (index > -1) {
+        blockedUsers.splice(index, 1);
+        bot.sendMessage(chatId, `Pengguna ${targetId} telah dibuka blokirnya.`);
+    } else {
+        bot.sendMessage(chatId, `Pengguna ${targetId} tidak ditemukan di daftar blokir.`);
     }
 });
