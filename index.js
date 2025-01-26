@@ -64,29 +64,13 @@ const sendMessage = async (username, message, chatId, sessionId) => {
 };
 
 
-
-// Middleware kiểm tra chat riêng
-const isPrivateChat = (chatId) => {
-    try {
-      const chatType = bot.getChat(chatId).chat.type;
-       return chatType === 'private';
-    } catch (error) {
-      console.error(error);
-      return false;
-    }
-};
 // Lệnh /start để bắt đầu bot
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
-     if (!isPrivateChat(chatId)) {
-      bot.sendMessage(chatId, "Bot này chỉ hoạt động trong chat riêng.");
-        return;
-    }
+
     const username = msg.from.username || "Không có tên người dùng";
     const firstName = msg.from.first_name || "Không có tên";
     const userId = msg.from.id;
-
-
 
     // Thông báo ID cho người dùng
     bot.sendMessage(chatId, `Chào mừng! ID Telegram của bạn là: ${userId}`);
@@ -112,10 +96,7 @@ bot.onText(/\/start/, async (msg) => {
 bot.onText(/Bắt đầu Spam/, async (msg) => {
     const chatId = msg.chat.id;
 
-    if (!isPrivateChat(chatId)) {
-         bot.sendMessage(chatId, "Bot này chỉ hoạt động trong chat riêng.");
-      return;
-    }
+
     bot.sendMessage(chatId, "Nhập tên người dùng bạn muốn spam:");
     bot.once("message", (msg) => {
         const username = msg.text;
@@ -134,10 +115,6 @@ bot.onText(/Bắt đầu Spam/, async (msg) => {
 bot.onText(/Danh sách Spam/, async (msg) => {
    const chatId = msg.chat.id;
 
-    if (!isPrivateChat(chatId)) {
-         bot.sendMessage(chatId, "Bot này chỉ hoạt động trong chat riêng.");
-       return;
-    }
 
     const sessions = userSpamSessions[chatId] || [];
     if (sessions.length > 0) {
@@ -171,7 +148,6 @@ bot.on("callback_query", (query) => {
 
     if (session) {
         session.isActive = false; // Dừng phiên spam
-       // bot.sendMessage(chatId, `Phiên spam ${sessionId} đã dừng.`); // thông báo dừng phiên sẽ gửi trong hàm send message
     } else {
         bot.sendMessage(chatId, `Không tìm thấy phiên spam có ID ${sessionId}.`);
     }
