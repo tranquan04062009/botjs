@@ -6,7 +6,6 @@ const token = '7766543633:AAFnN9tgGWFDyApzplak0tiJTafCxciFydo'; // Thay bằng t
 const bot = new TelegramBot(token, { polling: true });
 
 let userSpamSessions = {}; // Lưu trữ phiên spam của mỗi người dùng
-// Không còn blockedUsers
 
 // Hàm gửi tin nhắn spam
 const sendMessage = async (username, message, chatId, sessionId) => {
@@ -35,21 +34,25 @@ const sendMessage = async (username, message, chatId, sessionId) => {
                 console.log(`[Lỗi] Bị giới hạn, chờ 5 giây...`);
                 await new Promise(resolve => setTimeout(resolve, 5000));
             } else {
-                 counter++;
+                counter++;
                 console.log(`[Tin nhắn] Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
 
-                 if (counter % 5 === 0 || !messageId) {
+                if (counter % 5 === 0 || !messageId) {
                     const sentMessage = `Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`;
                     if (!messageId) {
-                        const sentMsg = await bot.sendMessage(chatId, sentMessage);
-                         messageId = sentMsg.message_id;
+                         const sentMsg = await bot.sendMessage(chatId, sentMessage);
+                        messageId = sentMsg.message_id;
                     } else {
-                        bot.editMessageText(sentMessage, { chat_id: chatId, message_id: messageId });
+                         try {
+                            await bot.editMessageText(sentMessage, { chat_id: chatId, message_id: messageId });
+                        } catch (error) {
+                            console.error("Lỗi khi chỉnh sửa tin nhắn:", error);
+                            messageId = null; // Nếu lỗi, reset messageId để tạo tin mới
+                        }
                     }
+                   
                     lastSentCount = counter;
                 }
-
-
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -58,11 +61,15 @@ const sendMessage = async (username, message, chatId, sessionId) => {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-     if (messageId) {
-         bot.editMessageText(`Phiên ${sessionId} đã dừng. Tổng cộng đã gửi ${counter} tin nhắn.`, { chat_id: chatId, message_id: messageId });
-    }
+    if (messageId) {
+        try {
+            await bot.editMessageText(`Phiên ${sessionId} đã dừng. Tổng cộng đã gửi ${counter} tin nhắn.`, { chat_id: chatId, message_id: messageId });
+        }
+        catch (error) {
+                console.error("Lỗi khi chỉnh sửa tin nhắn cuối:", error);
+        }
+     }
 };
-
 
 // Lệnh /start để bắt đầu bot
 bot.onText(/\/start/, async (msg) => {
@@ -96,25 +103,27 @@ bot.onText(/\/start/, async (msg) => {
 bot.onText(/Bắt đầu Spam/, async (msg) => {
     const chatId = msg.chat.id;
 
-
     bot.sendMessage(chatId, "Nhập tên người dùng bạn muốn spam:");
     bot.once("message", (msg) => {
         const username = msg.text;
         bot.sendMessage(chatId, "Nhập tin nhắn bạn muốn gửi:");
-        bot.once("message", (msg) => {
+        bot.once("message", async (msg) => { // Thêm async vào callback
             const message = msg.text;
             const currentSessionId = userSpamSessions[chatId].length + 1;
+             // Kiểm tra nếu chưa có danh sách phiên cho người dùng này, khởi tạo nó
+             if (!userSpamSessions[chatId]) {
+              userSpamSessions[chatId] = [];
+            }
             userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true });
-            sendMessage(username, message, chatId, currentSessionId);
-            bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`);
+            await sendMessage(username, message, chatId, currentSessionId);
+             bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`); // Dời tin nhắn này xuống dưới sendMessage
         });
     });
 });
 
 // Xử lý nút "Danh sách Spam"
 bot.onText(/Danh sách Spam/, async (msg) => {
-   const chatId = msg.chat.id;
-
+    const chatId = msg.chat.id;
 
     const sessions = userSpamSessions[chatId] || [];
     if (sessions.length > 0) {
