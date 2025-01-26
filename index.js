@@ -7,7 +7,7 @@ const bot = new TelegramBot(token, { polling: true });
 
 let userSpamSessions = {}; // Menyimpan daftar spam per pengguna
 let blockedUsers = []; // Menyimpan daftar pengguna yang diblokir
-const adminIdList = [6692083976]; // Tambahkan ID admin di sini
+const adminIdList = [6940071938]; // Tambahkan ID admin di sini
 
 // Fungsi untuk mengirim pesan spam
 const sendMessage = async (username, message, chatId, sessionId) => {
