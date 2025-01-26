@@ -50,7 +50,7 @@ const sendMessage = async (username, message, chatId, sessionId) => {
                             messageId = null; // Nếu lỗi, reset messageId để tạo tin mới
                         }
                     }
-                   
+
                     lastSentCount = counter;
                 }
             }
@@ -61,10 +61,10 @@ const sendMessage = async (username, message, chatId, sessionId) => {
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-    if (messageId) {
+     if (messageId) {
         try {
             await bot.editMessageText(`Phiên ${sessionId} đã dừng. Tổng cộng đã gửi ${counter} tin nhắn.`, { chat_id: chatId, message_id: messageId });
-        }
+         }
         catch (error) {
                 console.error("Lỗi khi chỉnh sửa tin nhắn cuối:", error);
         }
@@ -103,22 +103,23 @@ bot.onText(/\/start/, async (msg) => {
 bot.onText(/Bắt đầu Spam/, async (msg) => {
     const chatId = msg.chat.id;
 
-    bot.sendMessage(chatId, "Nhập tên người dùng bạn muốn spam:");
-    bot.once("message", (msg) => {
-        const username = msg.text;
-        bot.sendMessage(chatId, "Nhập tin nhắn bạn muốn gửi:");
-        bot.once("message", async (msg) => { // Thêm async vào callback
-            const message = msg.text;
-            const currentSessionId = userSpamSessions[chatId].length + 1;
-             // Kiểm tra nếu chưa có danh sách phiên cho người dùng này, khởi tạo nó
-             if (!userSpamSessions[chatId]) {
-              userSpamSessions[chatId] = [];
-            }
-            userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true });
-            await sendMessage(username, message, chatId, currentSessionId);
-             bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`); // Dời tin nhắn này xuống dưới sendMessage
-        });
-    });
+     bot.sendMessage(chatId, "Nhập tên người dùng bạn muốn spam:");
+    bot.once("message", async (msg) => {
+       const username = msg.text;
+       bot.sendMessage(chatId, "Nhập tin nhắn bạn muốn gửi:");
+       bot.once("message", async (msg) => { // Thêm async vào callback
+          const message = msg.text;
+          const currentSessionId = userSpamSessions[chatId].length + 1;
+
+          // Kiểm tra nếu chưa có danh sách phiên cho người dùng này, khởi tạo nó
+         if (!userSpamSessions[chatId]) {
+           userSpamSessions[chatId] = [];
+         }
+           userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true });
+         await sendMessage(username, message, chatId, currentSessionId);
+            bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`); // Dời tin nhắn này xuống dưới sendMessage
+     });
+   });
 });
 
 // Xử lý nút "Danh sách Spam"
