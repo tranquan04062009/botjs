@@ -9,39 +9,17 @@ let userSpamSessions = {}; // Lưu danh sách spam theo người dùng
 let blockedUsers = []; // Lưu danh sách người dùng bị chặn
 
 // Hàm gửi tin nhắn spam
-const sendMessage = async (username, message, chatId, sessionId, progressMessageId) => {
+const sendMessage = async (username, message, chatId, sessionId) => {
     let counter = 0;
-    const userAgents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36"
-    ];
-
-    const referrers = [
-        "https://www.google.com/",
-        "https://www.facebook.com/",
-        "https://www.reddit.com/",
-        "https://www.yahoo.com/"
-    ];
-
     while (userSpamSessions[chatId]?.[sessionId - 1]?.isActive) {
         try {
             const deviceId = crypto.randomBytes(21).toString("hex");
-            const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-            const randomReferrer = referrers[Math.floor(Math.random() * referrers.length)];
-
             const url = "https://ngl.link/api/submit";
             const headers = {
-                "User-Agent": randomUserAgent,
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Connection": "keep-alive",
-                "Referer": randomReferrer,
-                "X-Forwarded-For": `192.168.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
             };
-
-            const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=${randomReferrer}`;
+            const body = `username=${username}&question=${message}&deviceId=${deviceId}&gameSlug=&referrer=`;
 
             const response = await fetch(url, {
                 method: "POST",
@@ -55,16 +33,10 @@ const sendMessage = async (username, message, chatId, sessionId, progressMessage
             } else {
                 counter++;
                 console.log(`[Tin nhắn] Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
-
-                // Cập nhật tin nhắn tiến trình
-                bot.editMessageText(`Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`, {
-                    chat_id: chatId,
-                    message_id: progressMessageId
-                });
+                bot.sendMessage(chatId, `Phiên ${sessionId}: Đã gửi ${counter} tin nhắn.`);
             }
 
-            // Thời gian chờ ngẫu nhiên giữa các lần gửi tin nhắn
-            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 500) + 100));
+            await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (error) {
             console.error(`[Lỗi] ${error}`);
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -121,15 +93,7 @@ bot.onText(/Bắt đầu Spam/, (msg) => {
             const message = msg.text;
             const currentSessionId = userSpamSessions[chatId].length + 1;
             userSpamSessions[chatId].push({ id: currentSessionId, username, message, isActive: true });
-
-            // Gửi tin nhắn thông báo tiến trình
-            bot.sendMessage(chatId, `Phiên ${currentSessionId}: Đang bắt đầu spam...`, {
-                reply_markup: { inline_keyboard: [[{ text: "Dừng", callback_data: `stop_${currentSessionId}` }]] }
-            }).then((sentMessage) => {
-                const progressMessageId = sentMessage.message_id;
-                sendMessage(username, message, chatId, currentSessionId, progressMessageId);
-            });
-
+            sendMessage(username, message, chatId, currentSessionId);
             bot.sendMessage(chatId, `Phiên spam ${currentSessionId} đã bắt đầu!`);
         });
     });
